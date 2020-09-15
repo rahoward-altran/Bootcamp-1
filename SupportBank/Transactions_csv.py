@@ -1,4 +1,5 @@
 import csv
+from decimal import *
 
 def readtransactionfile():
     filename = "Transactions2014.csv"
@@ -21,7 +22,7 @@ def create_account_summary(data):
         tx = line[1]
         rx = line[2]
         # description = line[3]
-        amount = int(float(line[4])*100)
+        amount = Decimal(line[4])*100
         account_summary_dict[tx] = account_summary_dict.get(tx, 0) - amount
         account_summary_dict[rx] = account_summary_dict.get(rx, 0) + amount
     return account_summary_dict
@@ -48,10 +49,9 @@ def print_named_account(name, data):
 
 
 data = readtransactionfile()
-print(data)
 account_summary_dict = create_account_summary(data)
 
-userinput = input("Enter a command (list all or list [account name]: ")
+userinput = input("Enter a command (list all or list [account name]): ")
 userinput = userinput.upper()
 
 if userinput == "LIST ALL":

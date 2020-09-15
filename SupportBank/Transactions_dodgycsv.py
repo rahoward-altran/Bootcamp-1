@@ -4,12 +4,17 @@ import logging
 
 
 def readtransactionfile():
-    filename = "DodgyTransactions2015.csv"
     data = []
-    with open(filename) as transactionFile:
+    with open("Transactions2014.csv") as transactionFile:
         csv_obj = csv.reader(transactionFile, delimiter=",")
         for line in csv_obj:
             data.append(line)
+
+    with open("DodgyTransactions2015.csv") as transactionFile:
+        csv_obj = csv.reader(transactionFile, delimiter=",")
+        for line in csv_obj:
+            data.append(line)
+
     return data
 
 def create_account_summary(data):
@@ -84,7 +89,7 @@ if userinput == "LIST ALL":
     logging.info("Success: printed summaries")
 elif userinput[:4] == "LIST":
     name = userinput[5:]
-    logging.info("looking for the tranactions of " + name)
+    logging.info("looking for the transactions of " + name)
     print_named_account(name, data)
     logging.info("Success: printed " + name + "'s transactions")
 else:

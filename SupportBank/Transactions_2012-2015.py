@@ -3,36 +3,64 @@ import json
 from decimal import *
 import logging
 import xml.etree.ElementTree as ET
+from _datetime import datetime, timedelta
+
+
+def ooxmlDateToYMD(date):
+    # ooxml date is the number of days since 1899-12-31
+    # error with leap years
+    nullDate = datetime(1899, 12, 31)
+    newdate = nullDate + timedelta(int(date))
+    date_str = newdate.strftime("%d/%m/%Y")
+    return date_str
 
 def handlefile(filename, data):
     if filename[-3:] == "csv":
-        readcsv(filename, data)
+        try:
+            readcsv(filename, data)
+        except FileNotFoundError:
+            print("File not found")
+            logging.exception("File Not Found")
     elif filename[-4:] == "json":
-        readJson(filename, data)
+        try:
+            readJson(filename, data)
+        except FileNotFoundError:
+            print("File not found")
+            logging.exception("File Not Found")
+    elif filename[-3:] == "xml":
+        try:
+            readXML(filename, data)
+        except FileNotFoundError:
+            print("File not found")
+            logging.exception("File Not Found")
     else:
-        print("File not recognised")
+        print("File type not recognised")
         logging.exception("Couldn't process file type")
     return data
 
 def readtransactionfile(data):
+    data = readXML("Transactions2012.xml", data)
     data = readJson("Transactions2013.json", data)
     data = readcsv("Transactions2014.csv", data)
     data = readcsv("DodgyTransactions2015.csv", data)
-    data = readXML("Transactions2012.xml", data)
     return data
 
 def readXML(filename, data):
     tree = ET.parse(filename)
     root = tree.getroot()
-    readXML_recursive(root)
+    # Does a recusive depth first iteration through the tree structure starting from root
+    for transaction in root.findall('SupportTransaction'):
+        date = transaction.attrib['Date']
+        description = transaction.find('Description').text
+        amount = transaction.find('Value').text
+        parties = transaction.find('Parties')
+        tx = parties.find('From').text
+        rx = parties.find('To').text
+        #ToDO convert date
+        date = ooxmlDateToYMD(date)
+        data.append([date, tx, rx, description, amount])
     return data
 
-def readXML_recursive(root):
-    for child in root:
-        print(child)
-        #if child.tag == "SupportTransaction":
-        readXML_recursive(child)
-    return
 
 
 
@@ -153,7 +181,6 @@ while(notExit):
         notExit = False
         logging.info("successfullly exiting program")
     else:
-        print(userinputcaps)
-        print(userinputcaps[:11])
+        print("Command not recognised")
         logging.warning("User input was not recognised")
 

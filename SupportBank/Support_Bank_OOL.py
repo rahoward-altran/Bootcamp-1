@@ -7,7 +7,10 @@ from datetime import date, datetime, timedelta
 from decimal import *
 import re
 
-
+# Attributes in this class is:
+    # Date of transaction; the payer; payee; what the payment was for; and how much the payment was
+# Methods in this class:
+    # None
 class Transaction:
     date: date
     fromAccount: str
@@ -40,15 +43,14 @@ class Account:
     def add_transaction(self, new_transaction):
         #new transaction is of type transaction. errors pre-handled
         self.transactions.append(new_transaction)
-        logging.info("new transactions have been added")
+
 
     def update_balance(self):
         self.balance = 0
         for transaction in self.transactions:
-            # type(transaction) = Transaction
+            # info : type(transaction) = Transaction
             tx = transaction.fromAccount
             rx = transaction.toAccount
-            #assumption that all transactions assigned to this account are error free
             if self.account_name == tx:
                 self.balance -= transaction.amount
             elif self.account_name == rx:
@@ -59,7 +61,7 @@ class Account:
 
 
 # Attributes in this class is:
-    # accounts which is a dictionary of account holder name : account details
+    # accounts which is a dictionary of {account holder name : account details}
 # Methods in this class:
     # None
 class SupportBank:
@@ -69,7 +71,8 @@ class SupportBank:
         self.accounts = {}
 
 
-#----------------------------------------------------------------------------
+# FILE HANDLING FUNCTIONS-----------------------------------------------------------------------
+# Add all the transactions from the files into the SupportBank
 def read_transaction_file(bank):
     read_xml("Transactions2012.xml", bank)
     read_json("Transactions2013.json", bank)
@@ -77,15 +80,42 @@ def read_transaction_file(bank):
     read_csv("DodgyTransactions2015.csv", bank)
 
 
+# gets/creates bank accounts and executes 'Account.add_transaction(new_transaction)'
+# code wasn't very DRY so added this function:
+def get_account_add_transaction(bank, new_transaction):
+    # info: setdefault() gets a value of the given key if it exists, else adds {key: defaultValue} to the dictionary
+    # info: this is different to get() because get returns the value if key not found but does not modify the dictionary
+    default_account: Type[Account] = Account()
+    # Update Payers account
+    default_account.account_name = new_transaction.fromAccount
+    bank.accounts.setdefault(new_transaction.fromAccount, default_account).add_transaction(new_transaction)
+    # Update Payee account
+    default_account.account_name = new_transaction.toAccount
+    bank.accounts.setdefault(new_transaction.toAccount, default_account).add_transaction(new_transaction)
+
+
+# Verify that the date is in the expected format using reg expr
+def format_date(date):
+    if re.fullmatch("\d{2}/\d{2}/\d{4}", date) == None:
+        logging.exception("Error: Data was the wrong format")
+        raise ValueError("Date is in the wrong format")
+    return date
+
+
+# Convert ooxml date into day/month/year format
 def ooxml_date_to_dmy(date):
     # ooxml date is the number of days since 1899-12-31
     # error with leap years - scr = comment online
-    null_date = datetime(1899, 12, 31)
-    new_date = null_date + timedelta(int(date))
-    date_str = new_date.strftime("%d/%m/%Y")
+    try:
+        null_date = datetime(1899, 12, 31)
+        new_date = null_date + timedelta(int(date))
+        date_str = new_date.strftime("%d/%m/%Y")
+    except ValueError:
+        raise ValueError("Date was in wrong format")
     return date_str
 
 
+# read xml file and put all valid transaction into SupportBank
 def read_xml(filename, bank):
     tree = ET.parse(filename)
     root = tree.getroot()
@@ -103,24 +133,11 @@ def read_xml(filename, bank):
             print("Transaction in xml file was not as expected. It has been ignored")
             logging.exception("Transaction in file was not as expected. It has been ignored")
 
-        default_account_from: Type[Account] = Account()
-        default_account_from.account_name = new_transaction.fromAccount
-        default_account_to: Type[Account] = Account()
-        default_account_to.account_name = new_transaction.toAccount
-
-        # Get account of money sender and add new transaction
-        bank.accounts.setdefault(new_transaction.fromAccount, default_account_from).add_transaction(new_transaction)
-        # Get account of money receiver and add new transaction
-        bank.accounts.get(new_transaction.toAccount, default_account_to).add_transaction(new_transaction)
+        # Get account of money sender and receiver and add new transaction
+        get_account_add_transaction(bank, new_transaction)
 
 
-def format_date(date):
-    if re.fullmatch("\d{2}/\d{2}/\d{4}", date) == None:
-        logging.exception("Error: Data was the wrong format")
-        raise ValueError("Date is in the wrong format")
-    return date
-
-
+# read json file and put all valid transaction into SupportBank
 def read_json(filename, bank):
     with open(filename) as transactionFile:
         json_obj = json.load(transactionFile)
@@ -129,7 +146,7 @@ def read_json(filename, bank):
             try:
                 dl = line['date'].split('-')
                 date = dl[2] + "/" + dl[1] + "/" + dl[0]
-
+                # info: if error not thrown yet format_date should be redundant
                 new_transaction.date = format_date(date)
                 new_transaction.fromAccount = line['fromAccount']
                 new_transaction.toAccount = line['toAccount']
@@ -140,20 +157,11 @@ def read_json(filename, bank):
                 print("Transaction in json file was not as expected. It has been ignored")
                 logging.exception("Transaction in file was not as expected. It has been ignored")
 
-            default_account_from: Type[Account] = Account()
-            default_account_from.account_name = new_transaction.fromAccount
-            default_account_to: Type[Account] = Account()
-            default_account_to.account_name = new_transaction.toAccount
-            # ATTEMPT ONE - failed
-            # ToDo: investigate why 'bank.accounts.get(new_transaction.fromAccount, new_account_from)' doesn't work \
-                # todo cont: why setdefault work
-            # ATTEMPT 2
-            # Get account of money sender and add new transaction
-            bank.accounts.setdefault(new_transaction.fromAccount, default_account_from).add_transaction(new_transaction)
-            # Get account of money receiver and add new transaction
-            bank.accounts.setdefault(new_transaction.toAccount, default_account_to).add_transaction(new_transaction)
+            # Get account of money sender and receiver and add new transaction
+            et_account_add_transaction(bank, new_transaction)
 
 
+# read csv file and put all valid transaction into SupportBank
 def read_csv(filename, bank):
     with open(filename) as transactionFile:
         csv_obj = csv.DictReader(transactionFile, delimiter=",")
@@ -170,18 +178,11 @@ def read_csv(filename, bank):
                 logging.exception("Transaction in file was not as expected. It has been ignored")
                 continue
 
-            default_account_from: Type[Account] = Account()
-            default_account_from.account_name = new_transaction.fromAccount
-            default_account_to: Type[Account] = Account()
-            default_account_to.account_name = new_transaction.toAccount
-
-            # setdefault gets a value of given key if it exist. else sets to default
-            # Get account of money sender and add new transaction
-            bank.accounts.setdefault(new_transaction.fromAccount, default_account_from).add_transaction(new_transaction)
-            # Get account of money receiver and add new transaction
-            bank.accounts.setdefault(new_transaction.toAccount, default_account_to).add_transaction(new_transaction)
+            # Get account of money sender and receiver and add new transaction
+            get_account_add_transaction(bank, new_transaction)
 
 
+# handle request to import another file. Identify file type and execute corresponding function
 def handle_file(filename, bank):
     if filename[-3:] == "csv":
         try:
@@ -204,16 +205,19 @@ def handle_file(filename, bank):
     else:
         print("File type not recognised")
         logging.exception("Couldn't process file type")
+# END FILE HANDLING FUNCTIONS ---------------------------------------------------------------
 
-#--------------------------------------------------------------------------------------------
+
+# PRINT DATA FUNCTIONS -----------------------------------------------------------------------
+# prints the names and balances of all accounts in SupportBank
 def print_account_summary(bank):
     for account_name, account in bank.accounts.items():
         print(account_name, end=": ")
         print(account.balance)
 
 
+# prints all transactions associated with an account name
 def print_named_account(name, bank):
-    # ToDo: handle capitalisation of name
     if name in bank.accounts:
         print("Date | From | To | Naritive | Amount ")
         for transaction in bank.accounts.get(name).transactions:
@@ -224,10 +228,10 @@ def print_named_account(name, bank):
             print(transaction.amount)
     else:
         print("name not recognised. Name is case sensitive")
-#--------------------------------------------------------------------------------------------
+# END PRINT DATA FUNCTIONS -------------------------------------------------------------------
 
 
-#main
+# MAIN ---------------------------------------------------------------------------------------
 # Set up log
 logging.basicConfig(filename='SupportBank.log', filemode='w', level=logging.DEBUG)
 logging.info("Program has started and the log is open")

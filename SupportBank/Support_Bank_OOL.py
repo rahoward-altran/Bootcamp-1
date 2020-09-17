@@ -85,13 +85,15 @@ def read_transaction_file(bank):
 def get_account_add_transaction(bank, new_transaction):
     # info: setdefault() gets a value of the given key if it exists, else adds {key: defaultValue} to the dictionary
     # info: this is different to get() because get returns the value if key not found but does not modify the dictionary
-    default_account: Type[Account] = Account()
+    default_account_from: Type[Account] = Account()
+    default_account_from.account_name = new_transaction.fromAccount
+    default_account_to: Type[Account] = Account()
+    default_account_to.account_name = new_transaction.toAccount
+
     # Update Payers account
-    default_account.account_name = new_transaction.fromAccount
-    bank.accounts.setdefault(new_transaction.fromAccount, default_account).add_transaction(new_transaction)
+    bank.accounts.setdefault(new_transaction.fromAccount, default_account_from).add_transaction(new_transaction)
     # Update Payee account
-    default_account.account_name = new_transaction.toAccount
-    bank.accounts.setdefault(new_transaction.toAccount, default_account).add_transaction(new_transaction)
+    bank.accounts.setdefault(new_transaction.toAccount, default_account_to).add_transaction(new_transaction)
 
 
 # Verify that the date is in the expected format using reg expr
@@ -132,6 +134,7 @@ def read_xml(filename, bank):
         except:
             print("Transaction in xml file was not as expected. It has been ignored")
             logging.exception("Transaction in file was not as expected. It has been ignored")
+            continue
 
         # Get account of money sender and receiver and add new transaction
         get_account_add_transaction(bank, new_transaction)
@@ -151,14 +154,16 @@ def read_json(filename, bank):
                 new_transaction.fromAccount = line['fromAccount']
                 new_transaction.toAccount = line['toAccount']
                 new_transaction.description = line['narrative']
-                # ToDo: why does this produce crazy numbers?
-                new_transaction.amount = Decimal(line['amount'])
+                # info: stored in file as float. need to convert to str first before convert to Decimal
+                new_transaction.amount = Decimal(str(line['amount']))
             except:
                 print("Transaction in json file was not as expected. It has been ignored")
                 logging.exception("Transaction in file was not as expected. It has been ignored")
+                exit(-1)
+                # continue
 
             # Get account of money sender and receiver and add new transaction
-            et_account_add_transaction(bank, new_transaction)
+            get_account_add_transaction(bank, new_transaction)
 
 
 # read csv file and put all valid transaction into SupportBank
@@ -221,10 +226,10 @@ def print_named_account(name, bank):
     if name in bank.accounts:
         print("Date | From | To | Naritive | Amount ")
         for transaction in bank.accounts.get(name).transactions:
-            print(transaction.date, end="|")
-            print(transaction.fromAccount, end="|")
-            print(transaction.toAccount, end="|")
-            print(transaction.description, end="|")
+            print(transaction.date, end=" | ")
+            print(transaction.fromAccount, end=" | ")
+            print(transaction.toAccount, end=" | ")
+            print(transaction.description, end=" | ")
             print(transaction.amount)
     else:
         print("name not recognised. Name is case sensitive")
